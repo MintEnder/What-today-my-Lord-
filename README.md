@@ -35,7 +35,7 @@
    ```bash
    g++ main.cpp -o Village.exe
 3. Запустіть гру:
-    Bash
+    
 
        .\Village.exe
 
@@ -46,11 +46,11 @@
    Видаліть або закоментуйте рядок #include <windows.h> та SetConsoleOutputCP(CP_UTF8); у функції main().
 
 Скомпілюйте:
-    Bash
+    
 
     clang++ main.cpp -o Village
 Запустіть:
-    Bash
+    
 
     ./Village
 

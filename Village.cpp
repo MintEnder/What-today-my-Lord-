@@ -24,15 +24,35 @@ private:
     int stone = 0;
     
     int huts = 1; 
+    
+    // Нові механіки
+    int banditThreat = 0; // Від 0 до 100
 
     bool gameOver = false;
-    string lastEvent = "Ви заснували нове поселення і розподілили перші професії.";
+    string lastEvent = "Ви заснували поселення. Попереду багато випробувань.";
 
     int getRandomInt(int min, int max) {
         random_device rd;
         mt19937 gen(rd());
         uniform_int_distribution<> distrib(min, max);
         return distrib(gen);
+    }
+
+    string getSeason() {
+        int cycle = (day - 1) / 10; // 1 сезон = 10 днів
+        int s = cycle % 4;
+        if (s == 0) return "Весна";
+        if (s == 1) return "Літо";
+        if (s == 2) return "Осінь";
+        return "Зима";
+    }
+
+    double getFarmYield() {
+        string s = getSeason();
+        if (s == "Весна") return 3.0;
+        if (s == "Літо") return 4.0;
+        if (s == "Осінь") return 2.0;
+        return 1.0; // Взимку фермери майже не знаходять їжі
     }
 
     void killAdult() {
@@ -44,103 +64,177 @@ private:
         }
     }
 
+    // Універсальна функція для вбивства випадкових людей
+    void killRandomPeople(int count, int& adultsDied, int& childrenDied) {
+        for (int i = 0; i < count; i++) {
+            if (children > 0 && adults > 0) {
+                if (getRandomInt(1, 100) > 50) { children--; childrenDied++; } 
+                else { killAdult(); adultsDied++; }
+            } else if (children > 0) { children--; childrenDied++; } 
+            else if (adults > 0) { killAdult(); adultsDied++; } 
+            else { break; }
+        }
+    }
+
     void handleNewWorker(string message) {
         adults++; 
-        
         cout << "\033[2J\033[1;1H"; 
         cout << "========================================\n";
         cout << " ПОДІЯ: " << message << "\n";
         cout << "========================================\n";
         cout << " У вас з'явилися нові робочі руки!\n";
         cout << " Куди ви хочете призначити цю людину?\n";
-        cout << " 1. Фермери     (+" << 3 << " їжі/день)\n";
-        cout << " 2. Лісоруби    (+" << 2 << " дерева/день)\n";
-        cout << " 3. Каменярі    (+" << 1 << " каменю/день)\n";
-        cout << " 4. Будівельники (Зводять нові хатини)\n";
+        cout << " 1. Фермери     (Врожайність залежить від сезону)\n";
+        cout << " 2. Лісоруби    (+2 дерева/день)\n";
+        cout << " 3. Каменярі    (+1 каменю/день)\n";
+        cout << " 4. Будівельники (Зводять будівлі, ходять в каравани)\n";
         cout << " Ваш вибір: ";
         
         int choice;
         cin >> choice;
-        
         switch(choice) {
             case 1: farmers++; break;
             case 2: woodcutters++; break;
             case 3: miners++; break;
-            case 4: break; 
-            default: cout << "Невідомий вибір. Людина стала Будівельником.\n"; break;
+            case 4: break;
+            default: cout << "Людина стала Будівельником.\n"; break;
+        }
+    }
+
+    void diplomacyMenu() {
+        while (true) {
+            cout << "\033[2J\033[1;1H"; 
+            cout << "========================================\n";
+            cout << " ДИПЛОМАТІЯ ТА ТОРГІВЛЯ\n";
+            cout << "========================================\n";
+            cout << " Загроза розбійників: " << banditThreat << "%\n";
+            cout << " Ваші ресурси: Їжі (" << floor(food) << "), Дерева (" << wood << "), Каменю (" << stone << ")\n";
+            cout << "----------------------------------------\n";
+            cout << " МІСТО АЛЬБА (Торгівля):\n";
+            cout << " 1. Відправити 15 Дерева в обмін на 10 Їжі\n";
+            cout << " 2. Відправити 5 Каменю в обмін на 10 Їжі\n";
+            cout << " 3. Відправити 15 Їжі в обмін на 5 Каменю\n";
+            cout << " ТАБІР РОЗБІЙНИКІВ:\n";
+            cout << " 4. Заплатити данину (20 Їжі, 20 Дерева) -> Знижує загрозу на 40%\n";
+            cout << " 0. Повернутися до табору\n";
+            cout << " Ваш вибір: ";
+            
+            int choice;
+            cin >> choice;
+            
+            if (choice == 0) return;
+            
+            if (choice == 1) {
+                if (wood >= 15) { wood -= 15; food += 10; lastEvent = "Торгівля успішна! Отримано їжу."; return; }
+                else cout << "\nНедостатньо дерева!\n"; Sleep(1500);
+            }
+            else if (choice == 2) {
+                if (stone >= 5) { stone -= 5; food += 10; lastEvent = "Торгівля успішна! Отримано їжу."; return; }
+                else cout << "\nНедостатньо каменю!\n"; Sleep(1500);
+            }
+            else if (choice == 3) {
+                if (food >= 15) { food -= 15; stone += 5; lastEvent = "Торгівля успішна! Отримано камінь."; return; }
+                else cout << "\nНедостатньо їжі!\n"; Sleep(1500);
+            }
+            else if (choice == 4) {
+                if (food >= 20 && wood >= 20) {
+                    food -= 20; wood -= 20;
+                    banditThreat = max(0, banditThreat - 40);
+                    lastEvent = "Ви заплатили данину. Розбійники на деякий час заспокоїлись.";
+                    return;
+                } else cout << "\nНедостатньо ресурсів для данини!\n"; Sleep(1500);
+            }
         }
     }
 
     void processDay() {
-        // Видобуток ресурсів
-        food += farmers * 3.0;
+        lastEvent = "День пройшов."; 
+        string currentSeason = getSeason();
+        
+        // 0. Видобуток ресурсів
+        food += farmers * getFarmYield();
         wood += woodcutters * 2;
         stone += miners * 1; 
 
-        // Споживання їжі
+        // 1. Споживання їжі
         double consumption = (adults * 1.0) + (children * 0.5);
         food -= consumption;
         
-        lastEvent = "День пройшов спокійно. Ресурси зібрано."; 
+        // 2. Зимове опалення
+        if (currentSeason == "Зима") {
+            int heatNeeded = huts * 3;
+            if (wood >= heatNeeded) {
+                wood -= heatNeeded;
+            } else {
+                int missingWood = heatNeeded - wood;
+                wood = 0;
+                int frozen = getRandomInt(1, missingWood);
+                int aDied = 0, cDied = 0;
+                killRandomPeople(frozen, aDied, cDied);
+                lastEvent += "\n[ХОЛОД] Не вистачило дров для опалення! Замерзло: " + to_string(aDied) + " дор., " + to_string(cDied) + " діт.";
+            }
+        }
         
-        // ГОЛОД
+        // 3. ЖОРСТКА ПЕРЕВІРКА НА ГОЛОД
         if (food < 0) {
             int missingFood = ceil(abs(food)); 
             food = 0;
             
             int deaths = getRandomInt(1, missingFood);
-            int adultsDied = 0;
-            int childrenDied = 0;
-
-            for (int i = 0; i < deaths; i++) {
-                if (children > 0 && adults > 0) {
-                    if (getRandomInt(1, 100) > 50) { 
-                        children--; childrenDied++;
-                    } else {
-                        killAdult(); adultsDied++;
-                    }
-                } else if (children > 0) {
-                    children--; childrenDied++;
-                } else if (adults > 0) {
-                    killAdult(); adultsDied++;
-                } else {
-                    break; 
-                }
-            }
+            int adultsDied = 0, childrenDied = 0;
+            killRandomPeople(deaths, adultsDied, childrenDied);
             
-            lastEvent = "УВАГА: МАСОВИЙ ГОЛОД! Через нестачу їжі померло: " + to_string(adultsDied) + " дорослих та " + to_string(childrenDied) + " дітей.";
-
-            if (adults <= 0 && children <= 0) {
-                gameOver = true;
-                lastEvent = "Усі поселенці загинули від голоду. Поселення перетворилося на руїни...";
-                return;
-            }
+            lastEvent += "\n[ГОЛОД] Померло: " + to_string(adultsDied) + " дорослих, " + to_string(childrenDied) + " дітей.";
         } 
-        else {
-            int totalPopulation = adults + children;
-            int capacity = huts * 5;
-            
-            if (totalPopulation < capacity) {
-                int eventChance = getRandomInt(1, 100);
-                
-                if (eventChance <= 15) {
-                    handleNewWorker("До вашого поселення прийшов мандрівник!");
-                    lastEvent = "Прийшов мандрівник. Ви призначили йому професію.";
-                } 
-                else if (eventChance > 15 && eventChance <= 35 && adults >= 2) {
-                    children++;
-                    lastEvent = "Чудові новини! У поселенні народилася дитина.";
-                }
-            }
+        
+        // Перевірка на програш від смертей
+        if (adults <= 0 && children <= 0) {
+            gameOver = true;
+            lastEvent = "Усі поселенці загинули. Поселення перетворилося на руїни...";
+            return;
         }
 
-        // 4. Дорослішання дітей 
-        if (children > 0) {
-            if (getRandomInt(1, 100) <= 15) { 
-                children--;
-                handleNewWorker("Одна з дітей у поселенні подорослішала!");
-                lastEvent += " Дитина виросла і отримала професію!"; 
-            }
+        // 4. Загроза розбійників
+        banditThreat += getRandomInt(2, 6);
+        if (banditThreat >= 100) {
+            banditThreat = 0;
+            int adultsKilled = 0, childrenKilled = 0;
+            killRandomPeople(getRandomInt(1, 3), adultsKilled, childrenKilled);
+            food = max(0.0, food / 2); // Крадуть половину їжі
+            lastEvent += "\n[НАПАД] Розбійники атакували! Вбито: " + to_string(adultsKilled+childrenKilled) + ". Вкрадено половину їжі.";
+        }
+        
+        // 5. Випадкові події (якщо немає інших масштабних катастроф)
+        int eventChance = getRandomInt(1, 100);
+        
+        if (currentSeason == "Літо" && eventChance <= 10 && huts > 1) {
+            huts--;
+            lastEvent += "\n[ПОЖЕЖА] Через спеку згоріла одна хатина!";
+        } else if (currentSeason == "Осінь" && eventChance <= 10) {
+            food = max(0.0, food - 10);
+            lastEvent += "\n[ХВОРОБА] Поселення охопила лихоманка. Люди з'їли запаси, щоб одужати (-10 Їжі).";
+        } else if (currentSeason == "Зима" && eventChance <= 10) {
+            int aD = 0, cD = 0;
+            killRandomPeople(1, aD, cD);
+            lastEvent += "\n[ВОВКИ] Голодні вовки загризли 1 людину.";
+        }
+        
+        // Приріст населення
+        int totalPopulation = adults + children;
+        if (totalPopulation < huts * 5 && eventChance > 80 && eventChance <= 85) {
+            handleNewWorker("До вашого поселення прийшов мандрівник!");
+            lastEvent += "\n[ПОПОВНЕННЯ] Прийшов мандрівник.";
+        } 
+        else if (totalPopulation < huts * 5 && eventChance > 85 && eventChance <= 95 && adults >= 2) {
+            children++;
+            lastEvent += "\n[ПОПОВНЕННЯ] У поселенні народилася дитина.";
+        }
+
+        // 6. Дорослішання дітей 
+        if (children > 0 && getRandomInt(1, 100) <= 10) { 
+            children--;
+            handleNewWorker("Одна з дітей у поселенні подорослішала!");
+            lastEvent += "\n[ПОДІЯ] Дитина виросла і отримала професію!"; 
         }
 
         day++;
@@ -149,37 +243,34 @@ private:
     void assignProfession(int& jobVar, string jobName) {
         int builders = adults - (farmers + woodcutters + miners);
         int maxAvailable = jobVar + builders;
-        
         cout << "\nЗараз Будівельників: " << builders << " | Зараз " << jobName << ": " << jobVar << "\n";
         cout << "Введіть нову кількість (від 0 до " << maxAvailable << "): ";
         int count;
         cin >> count;
-        
-        if (count >= 0 && count <= maxAvailable) {
-            jobVar = count;
-            lastEvent = "Ви перерозподілили професію: " + jobName + ".";
-        } else {
-            lastEvent = "Помилка! У вас немає стільки людей.";
-        }
+        if (count >= 0 && count <= maxAvailable) { jobVar = count; lastEvent = "Професію змінено."; } 
+        else { lastEvent = "Помилка! У вас немає стільки людей."; }
     }
 
 public:
     void drawUI() {
         cout << "\033[2J\033[1;1H"; 
         cout << "========================================\n";
-        cout << " ДЕНЬ " << day << " | ПОСЕЛЕННЯ\n";
+        cout << " ДЕНЬ " << day << " | СЕЗОН: " << getSeason() << "\n";
         cout << "========================================\n";
-        int totalPopulation = adults + children;
+        
+        // Попередження про зиму
+        if(getSeason() == "Зима") cout << " [!] УВАГА: Опалення потребує " << huts * 3 << " дерева щодня!\n";
+        if(banditThreat >= 80) cout << " [!] УВАГА: Розбійники готують напад (" << banditThreat << "%)\n";
+        
         int builders = adults - (farmers + woodcutters + miners);
         
-        cout << " Населення: " << totalPopulation << " / " << (huts * 5) << " (Дітей: " << children << ")\n";
+        cout << " Населення: " << adults+children << " / " << (huts * 5) << " (Дітей: " << children << ")\n";
         cout << " Дорослих:  " << adults << "\n";
         cout << "----------------------------------------\n";
-        cout << " ПРОФЕСІЇ:\n";
-        cout << " [Ф] Фермери:      " << farmers << "  (Приносять +" << farmers * 3 << " їжі/день)\n";
+        cout << " [Ф] Фермери:      " << farmers << "  (Приносять +" << farmers * getFarmYield() << " їжі/день)\n";
         cout << " [Л] Лісоруби:     " << woodcutters << "  (Приносять +" << woodcutters * 2 << " дерева/день)\n";
         cout << " [К] Каменярі:     " << miners << "  (Приносять +" << miners * 1 << " каменю/день)\n";
-        cout << " [Б] Будівельники: " << builders << "  (Доступні для зведення хатин)\n";
+        cout << " [Б] Будівельники: " << builders << "  (Будують та торгують)\n";
         cout << "----------------------------------------\n";
         cout << " СКЛАД:\n";
         cout << " Їжа:    " << floor(food) << "\n"; 
@@ -187,15 +278,14 @@ public:
         cout << " Камінь: " << stone << "\n";
         cout << " Хатини: " << huts << "\n";
         cout << "========================================\n";
-        cout << " ОСТАННЯ ПОДІЯ:\n " << lastEvent << "\n";
+        cout << " ОСТАННІ ПОДІЇ:\n " << lastEvent << "\n";
         cout << "========================================\n";
-        cout << " НАКАЗ:\n";
-        cout << " 1. Перерозподілити Фермерів\n";
-        cout << " 2. Перерозподілити Лісорубів\n";
-        cout << " 3. Перерозподілити Каменярів\n";
-        cout << " 4. Побудувати хатину (Вартість: 20 дерева, 5 каменю)\n";
-        cout << " 5. Зібрати ресурси\n";
-        cout << " 0. Здатися і покинути поселення\n";
+        cout << " УПРАВЛІННЯ:\n";
+        cout << " 1. Фермери  | 2. Лісоруби | 3. Каменярі\n";
+        cout << " 4. Побудувати хатину (20 дерева, 5 каменю)\n";
+        cout << " 5. ДИПЛОМАТІЯ ТА ТОРГІВЛЯ (Місто / Розбійники)\n";
+        cout << " 9. [ ПРОПУСТИТИ ДЕНЬ ]\n";
+        cout << " 0. Здатися\n";
         cout << " Ваш вибір: ";
     }
 
@@ -214,19 +304,20 @@ public:
                 case 4:
                     if (wood >= 20 && stone >= 5 && builders >= 1) {
                         wood -= 20; stone -= 5; huts++;
-                        lastEvent = "Побудована нова хатина! Використано матеріали та працю будівельників.";
+                        lastEvent = "Побудована нова хатина!";
                     } else if (builders < 1) {
-                        lastEvent = "Немає кому будувати! Призначте хоча б одного Будівельника (переведіть з іншої професії).";
+                        lastEvent = "Потрібен хоча б 1 Будівельник!";
                     } else {
-                        lastEvent = "Недостатньо матеріалів! (Треба: 20 дерева, 5 каменю)";
+                        lastEvent = "Недостатньо матеріалів! (20 дерева, 5 каменю)";
                     }
                     break;
-                case 5: processDay(); break;
-                case 0:
-                    gameOver = true;
-                    lastEvent = "Ви залишили своє поселення на призволяще...";
+                case 5: 
+                    if (builders >= 1) diplomacyMenu(); 
+                    else lastEvent = "Щоб відправити караван, потрібен хоча б 1 Будівельник (вільний робітник)!";
                     break;
-                default: lastEvent = "Невідомий наказ, мілорде."; break;
+                case 9: processDay(); break;
+                case 0: gameOver = true; break;
+                default: lastEvent = "Невідомий наказ."; break;
             }
         }
         

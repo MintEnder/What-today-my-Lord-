@@ -32,28 +32,26 @@
 ### Для Windows (через MinGW/GCC):
 1. Відкрийте термінал у папці з файлом `main.cpp`.
 2. Скомпілюйте код:
-   ```bash
- g++ main.cpp -o Village.ex
-3. Запустіть гру:
-    Bash
+   
+         g++ main.cpp -o Village.ex
+   
+4. Запустіть гру:
 
-  .\settlement.exe
+         .\settlement.exe
 
-    Примітка: У коді використовується SetConsoleOutputCP(CP_UTF8); для коректного відображення кирилиці в консолі Windows.
+Примітка: У коді використовується SetConsoleOutputCP(CP_UTF8); для коректного відображення кирилиці в консолі Windows.
 
 Для macOS / Linux:
 
   Видаліть або закоментуйте рядок #include <windows.h> та SetConsoleOutputCP(CP_UTF8); у функції main().
 
- Скомпілюйте:
-    Bash
-
-  clang++ main.cpp -o Village
+Скомпілюйте:
+ 
+     clang++ main.cpp -o Village
 
 Запустіть:
-    Bash
 
-  ./Village
+     ./Village
 
 ## 🎮 Управління
 
